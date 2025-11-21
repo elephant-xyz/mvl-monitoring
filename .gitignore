@@ -1,0 +1,5 @@
+accounts*.yaml
+venv
+.venv
+*.png
+*.csv
