@@ -1,6 +1,6 @@
 # MVL Monitoring - CloudWatch Metrics Collection
 
-This tool collects and visualizes MVL (Mirror Validator Logger) completeness metrics from multiple AWS accounts using CloudWatch Logs Insights.
+This tool collects and visualizes MVL (Mirror Validator Layer) completeness metrics from multiple AWS accounts using CloudWatch Logs Insights.
 
 ## Overview
 
