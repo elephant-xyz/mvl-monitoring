@@ -122,14 +122,30 @@ fields
 
 ## Example Output
 
-```
-Loaded 2 accounts from accounts.yaml
+### CSV File (`metrics_20251121_174841.csv`)
 
-=== Processing account 123456789012 ===
-Account 123456789012 using log group: /aws/lambda/mvl-validator
-  Account 123456789012 | hour_offset=0 | window=2025-11-21T16:00:00Z .. 2025-11-21T17:00:00Z
-  ...
-
-Results saved to metrics_20251121_174841.csv
-Visualization saved to metrics_20251121_174841.png
+```csv
+account_id,county,timestamp,avg_mvl_metric
+123456789012,CountyA,2025-11-21T17:00:00Z,0.9523
+123456789012,CountyA,2025-11-21T16:00:00Z,0.9412
+123456789012,CountyB,2025-11-21T17:00:00Z,0.8765
+123456789012,CountyB,2025-11-21T16:00:00Z,0.8901
+987654321098,CountyA,2025-11-21T17:00:00Z,0.9201
+987654321098,CountyA,2025-11-21T16:00:00Z,0.9345
+...
 ```
+
+The CSV contains one row per measurement with:
+- **account_id**: AWS account number
+- **county**: County name from the logs
+- **timestamp**: ISO 8601 timestamp (end of the hourly window)
+- **avg_mvl_metric**: Average completeness value for that hour (0-1 range)
+
+### Visualization (`metrics_20251121_174841.png`)
+
+A high-resolution time series plot showing:
+- **X-axis**: Time (last 24 hours, formatted as HH:MM)
+- **Y-axis**: Average MVL metric (completeness score)
+- **Lines**: One line per (Account + County) combination
+- **Legend**: Shows "AccountID - CountyName" for each line
+- **Format**: 16x8 inch, 300 DPI PNG suitable for reports and presentations
