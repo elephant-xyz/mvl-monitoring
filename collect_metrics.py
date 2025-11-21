@@ -1,3 +1,4 @@
+import argparse
 import csv
 import time
 from datetime import datetime, UTC
@@ -13,7 +14,7 @@ import pandas as pd
 import seaborn as sns
 
 # ---------- CONFIG ----------
-ACCOUNTS_FILE = "accounts.yaml"
+ACCOUNTS_FILE = "accounts-dev.yaml"
 REGION = "us-east-1"  # adjust to your region
 STACK_NAME = "elephant-oracle-node"
 LOG_GROUP_OUTPUT_KEY = "WorkflowMirrorValidatorLogGroupName"
@@ -172,10 +173,17 @@ def create_visualization(csv_filepath: str, output_filepath: str):
 MAX_WORKERS = 6  # Number of parallel threads for processing accounts
 
 
-def process_account(acc: dict, now: int) -> dict:
+def process_account(acc: dict, now: int, hours_range: int, granularity_minutes: int) -> dict:
     """
-    Process a single account: fetch log group and run 24 hourly queries.
-    Returns a dict: {account_id: {county: [24 hourly values]}}
+    Process a single account: fetch log group and run queries for the specified time range.
+
+    Args:
+        acc: Account dictionary with credentials
+        now: Current Unix timestamp
+        hours_range: How many hours to look back
+        granularity_minutes: Size of each time window in minutes
+
+    Returns a dict: {account_id: {county: [list of values for each time window]}}
     """
     account_id = acc["account_id"]
     print(f"\n=== Processing account {account_id} ===")
@@ -202,15 +210,19 @@ def process_account(acc: dict, now: int) -> dict:
     print(f"Account {account_id} using log group: {log_group_name}")
 
     logs_client = session.client("logs", region_name=REGION)
-    account_results = defaultdict(lambda: [None] * 24)
 
-    # For the last 24 hours: 0 = last hour, 23 = 24 hours ago
-    for hour_offset in range(24):
-        window_end = now - hour_offset * 3600
-        window_start = window_end - 3600
+    # Calculate number of windows
+    granularity_seconds = granularity_minutes * 60
+    num_windows = int((hours_range * 3600) / granularity_seconds)
+    account_results = defaultdict(lambda: [None] * num_windows)
+
+    # Query each time window
+    for window_offset in range(num_windows):
+        window_end = now - window_offset * granularity_seconds
+        window_start = window_end - granularity_seconds
 
         print(
-            f"  Account {account_id} | hour_offset={hour_offset} "
+            f"  Account {account_id} | window_offset={window_offset} "
             f"| window={ts_to_iso(window_start)} .. {ts_to_iso(window_end)}"
         )
 
@@ -236,12 +248,31 @@ def process_account(acc: dict, now: int) -> dict:
                 print(f"[WARN] Could not parse avg value '{avg_str}'")
                 continue
 
-            account_results[county][hour_offset] = avg_val
+            account_results[county][window_offset] = avg_val
 
     return {account_id: dict(account_results)}
 
 
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="Collect MVL completeness metrics from AWS CloudWatch Logs across multiple accounts"
+    )
+    parser.add_argument("--range-hours", type=int, default=24, help="How many hours to look back (default: 24)")
+    parser.add_argument(
+        "--granularity-minutes", type=int, default=60, help="Size of each time window in minutes (default: 60)"
+    )
+    args = parser.parse_args()
+
+    hours_range = args.range_hours
+    granularity_minutes = args.granularity_minutes
+    granularity_seconds = granularity_minutes * 60
+
+    print(f"Configuration:")
+    print(f"  Time range: {hours_range} hours")
+    print(f"  Granularity: {granularity_minutes} minutes")
+    print(f"  Number of windows: {int((hours_range * 3600) / granularity_seconds)}")
+
     accounts = load_accounts(ACCOUNTS_FILE)
     print(f"Loaded {len(accounts)} accounts from {ACCOUNTS_FILE}")
 
@@ -250,7 +281,10 @@ def main():
     # Process accounts in parallel
     results = {}
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(process_account, acc, now): acc["account_id"] for acc in accounts}
+        futures = {
+            executor.submit(process_account, acc, now, hours_range, granularity_minutes): acc["account_id"]
+            for acc in accounts
+        }
 
         for future in as_completed(futures):
             account_id = futures[future]
@@ -267,6 +301,9 @@ def main():
     csv_filename = f"metrics_{timestamp}.csv"
     png_filename = f"metrics_{timestamp}.png"
 
+    # Calculate number of windows
+    num_windows = int((hours_range * 3600) / granularity_seconds)
+
     # Write CSV in long/tidy format
     with open(csv_filename, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -275,11 +312,11 @@ def main():
 
         for account_id, counties in sorted(results.items()):
             for county, values in sorted(counties.items()):
-                # Each hour gets its own row
-                for hour_offset in range(24):
-                    window_end = now - hour_offset * 3600
+                # Each window gets its own row
+                for window_offset in range(num_windows):
+                    window_end = now - window_offset * granularity_seconds
                     timestamp_str = ts_to_iso(window_end)
-                    metric_value = values[hour_offset]
+                    metric_value = values[window_offset]
 
                     # Only write rows where we have data
                     if metric_value is not None:

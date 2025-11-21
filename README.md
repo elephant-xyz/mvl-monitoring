@@ -70,10 +70,34 @@ MAX_WORKERS = 6                          # Number of parallel threads
 
 ## Usage
 
-Run the script:
+Run the script with default parameters (24 hours, 60-minute windows):
 
 ```bash
 python collect_metrics.py
+```
+
+### Command Line Options
+
+- `--range-hours`: How many hours to look back (default: 24)
+- `--granularity-minutes`: Size of each time window in minutes (default: 60)
+
+### Examples
+
+```bash
+# Default: Last 24 hours with 1-hour windows (24 queries per account)
+python collect_metrics.py
+
+# Last 12 hours with 30-minute windows (24 queries per account)
+python collect_metrics.py --range-hours 12 --granularity-minutes 30
+
+# Last 48 hours with 2-hour windows (24 queries per account)
+python collect_metrics.py --range-hours 48 --granularity-minutes 120
+
+# Last 6 hours with 15-minute granularity (24 queries per account)
+python collect_metrics.py --range-hours 6 --granularity-minutes 15
+
+# View help
+python collect_metrics.py --help
 ```
 
 ### Output Files
