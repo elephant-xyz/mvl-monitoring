@@ -14,7 +14,7 @@ import pandas as pd
 import seaborn as sns
 
 # ---------- CONFIG ----------
-ACCOUNTS_FILE = "accounts-dev.yaml"
+ACCOUNTS_FILE = "accounts.yaml"
 REGION = "us-east-1"  # adjust to your region
 STACK_NAME = "elephant-oracle-node"
 LOG_GROUP_OUTPUT_KEY = "WorkflowMirrorValidatorLogGroupName"
